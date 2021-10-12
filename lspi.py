@@ -1,15 +1,18 @@
 from lib.functions import *
 import pickle
 
-M = 400
-mu = 700
-sigma = 200
-D = generate_dataset(M, mu, sigma)
-gamma = 0.6
-N = 10
+# LSPI algorithm (Section 7.2, Algorithm 6)
 
+# Parameters (fill in)
+M = 50000  # Dataset size
+mu = 700  # Mean number of patients in each state
+sigma = 200  # Variance of number of patients in each state
+gamma = 0.6  # Discount factor
+N = 10  # Maximum number of iterations
 eps = 0.01
 delta = 1.5
+
+D = generate_dataset(M, mu, sigma)
 F = len(phi(D[0][0]))
 theta = np.zeros((F, 1))
 theta_dif = 100
@@ -28,7 +31,7 @@ while (theta_dif > delta) and (n < N):
             print(m)
         s, patients = D[m]
 
-        action = pi(s, theta, gamma)
+        action = pi(s, theta, gamma)  # Use current policy to choose action
 
         # Transition to new state
         s_new = {i: 0 for i in idx}
@@ -52,10 +55,8 @@ while (theta_dif > delta) and (n < N):
     theta_dif = np.linalg.norm(theta - theta_new)
     theta = theta_new
     print('Difference: ', theta_dif)
-    for i in range(F):
-        print(str(round(theta[i][0], 8)), end=', ')
-    print()
 
+# Save parameter vector for use in simulation
 theta_file = open('lib/theta', 'wb')
 pickle.dump(theta, theta_file)
 theta_file.close()

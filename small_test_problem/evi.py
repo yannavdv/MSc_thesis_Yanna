@@ -2,10 +2,13 @@ from small_test_problem.lib.functions import *
 from math import comb
 import pickle
 
-gamma = 0.9
-eps = 0.1
-delta = eps * (1 - gamma) / (2 * gamma)
+# Exact value iteration (Section 7.1, Algorithm 5)
 
+# Parameters (fill in)
+gamma = 0.9  # Discount factor
+eps = 0.1  # Tolerance parameter
+
+delta = eps * (1 - gamma) / (2 * gamma)
 v = {s: max([contribution_evi(pre_transition(list(s).copy(), a)[0], a) for a in possible_actions(s)]) for s in states}
 norm_v_dif = 1000
 norm_file = open('norms_exact.dat', 'w')
@@ -43,6 +46,7 @@ while norm_v_dif > delta:
     n += 1
 
 norm_file.close()
+# Save value function for later use
 value_file = open('value_function.pkl', 'wb')
 pickle.dump(v, value_file)
 value_file.close()

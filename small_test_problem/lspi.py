@@ -1,6 +1,8 @@
 from small_test_problem.lib.functions import *
 import pickle
 
+# Least-squares policy iteration for small test problem (Section 7.2, Algorithm 6)
+
 
 def lspi(D, M, N, gamma):
     eps = 0.01

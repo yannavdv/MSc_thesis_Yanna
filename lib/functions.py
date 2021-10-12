@@ -1,5 +1,6 @@
-from lib.patient import *
 from lib.parameters.params_smk import *
+# from lib.parameters.params_large import *
+from lib.patient import *
 import numpy as np
 import random
 import gurobipy as gp
@@ -7,6 +8,7 @@ from gurobipy import GRB
 
 
 def cost(j, u, w):
+    """Calculate cost for patient in queue j with urgency u and waiting time w."""
     if w < u:
         return 0
     else:
@@ -14,16 +16,25 @@ def cost(j, u, w):
 
 
 def contribution(s, a):
+    """Calculate contribution of performing action a in state s."""
     c = sum(cost(j, u, w) * (s[(j, u, w)] - a[(j, u, w)]) for (j, u, w) in idx)
     r = sum(reward[j] * sum(a[(j, u, w)] for u in U[j] for w in range(W[j, u])) for j in J)
     return r - c
 
 
 def phi(s):
+    """Basis function 1: full state vector."""
     return np.array([[s[i] for i in idx]]).T
 
 
 def pi(s, theta, gamma):
+    """
+    Approximate policy function for LSPI
+    :param s: Current state
+    :param theta: Parameter vector
+    :param gamma: Discount factor
+    :return: Feasible action maximizing contribution + approximate value of next state
+    """
     model = gp.Model()
     model.Params.LogToConsole = 0
     a = model.addVars(idx, name="action", vtype=GRB.INTEGER)
@@ -51,23 +62,33 @@ def pi(s, theta, gamma):
     return {i: int(a[i].X) for i in idx}
 
 
-def highest_contribution(state):
-    action = {i: 0 for i in idx}
-    for r in R:
-        r_patients = [(j, u, w) for j in r_queues[r] for u in U[j]
-                      for w in range(W[j, u]) for _ in range(int(state[j, u, w]))]
-        r_patients.sort(key=lambda x: (reward[x[0]] + cost(*x)) / zeta[x[0], r], reverse=True)
-        capacity = eta[r]
-        for p in r_patients:
-            capacity -= zeta[p[0], r]
-            if capacity < 0:
-                break
-            action[p] += 1
-    return action
+def generate_patient(new=True, short=False):
+    """
+    Patient generator
+    :param new: True if patient is new in the system (first stage of pathway, waiting time 0), else False
+    :param short: True if only current and next stage of patient are required (used in LSPI dataset)
+    :return: Randomly generated patient
+    """
+    try:  # using full dataset; paths exist
+        path = random.choice(all_paths)
+    except NameError:  # using large dataset; generate random path
+        path = [('FC', U['FC'][0])]
+        done = False
+        while not done:
+            current = path[-1]
+            r = np.random.rand()
+            total = 0
+            for j in J:
+                if r <= total:
+                    break
+                for u in U[j]:
+                    total += q[(current[0], current[1], j, u)]  # probability of transitioning to (j, u)
+                    if r <= total:
+                        path += [(j, u)]
+                        break
+            if r > total:  # no transition took place
+                done = True
 
-
-def generate_patient(new, short):
-    path = random.choice(all_paths)
     if new:
         stage = 0
         waiting_time = 0
@@ -81,6 +102,13 @@ def generate_patient(new, short):
 
 
 def generate_dataset(M, mu, sigma):
+    """
+    Generate dataset for LSPI
+    :param M: Number of states in dataset
+    :param mu: Mean number of patients in each state
+    :param sigma: Variance of number of patients in each state
+    :return: Dataset D
+    """
     D = []
     for i in range(M):
         num_patients = int(np.random.normal(mu, sigma))
@@ -95,6 +123,14 @@ def generate_dataset(M, mu, sigma):
 
 
 def predict_state(current_state, compact_actions, start_time, end_time):
+    """
+    State prediction (Algorithm 3)
+    :param current_state: The current state
+    :param compact_actions: Actions between start- and end-time per queue
+    :param start_time: Current time period
+    :param end_time: Time period for which state should be predicted
+    :return: Predicted state at end_time
+    """
     pred_states = {(*i, t): 0 for i in idx for t in range(start_time, end_time + 1)}
     for i in idx:
         pred_states[(*i, start_time)] = current_state[i]
@@ -119,29 +155,36 @@ def predict_state(current_state, compact_actions, start_time, end_time):
     return {i: pred_states[(*i, end_time)] for i in idx}
 
 
-def init_state(initial_patients, time=None, new_patients=None):
-    if time is None:
-        states = {i: 0 for i in idx}
-    else:
-        states = {(*i, t): 0 for i in idx for t in range(time + 1)}
+def init_state(initial_patients, time_horizon, new_patients):
+    """
+    Initialise states for simulation
+    :param initial_patients: Number of initial patients in system
+    :param time_horizon: Time horizon of simulation
+    :param new_patients: Number of new patients in each time period
+    :return: States, patients currently in system, and new patients to be added to system
+    """
+    states = {(*i, t): 0 for i in idx for t in range(time_horizon + 1)}
     patients = {i: [] for i in idx}
 
     # Generate patients for initial state
     for _ in range(initial_patients):
         p = generate_patient(new=False, short=False)
-        if time is None:
-            states[p.get_stage()] += 1
-        else:
-            states[(*p.get_stage(), 0)] += 1
+        states[(*p.get_stage(), 0)] += 1
         patients[p.get_stage()].append(p)
 
-    if new_patients is None:
-        return states, patients
-    else:
-        return states, patients, [generate_patient(new=True, short=False) for _ in range(time * new_patients)]
+    return states, patients, [generate_patient(new=True, short=False) for _ in range(time_horizon * new_patients)]
 
 
 def perform_compact_action(states, patients, t, action, redistribute=False):
+    """
+    Treat patients according to action
+    :param states: States in all time periods
+    :param patients: Patients currently in the system
+    :param t: Current time period
+    :param action: Compact action, specified per queue j
+    :param redistribute: True if leftover OD capacity should be allocated to other OD queues if possible
+    :return: Updated states and patients, realization of the action, contribution gained
+    """
     true_action = {i: 0 for i in idx}
     c = 0
     sorted_patients = {}

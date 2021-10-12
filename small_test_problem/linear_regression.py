@@ -5,7 +5,7 @@ import random
 
 # Parameters (fill in)
 k = 10  # number of folds for k-fold cross validation
-phi = one  # basis function to test
+phi = one  # basis function to test (see lib/basis_functions.py)
 
 F = len(phi(list(states[0])))
 function_name = phi.__name__

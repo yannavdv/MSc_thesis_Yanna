@@ -82,29 +82,6 @@ def simulate_solution(states, patients, new_patient_list, time, algo='LP', theta
             s = [current_state[j, w] for j in J for w in waiting_times]
             action = pi(s, theta, gamma)
 
-        elif algo == 'Rule':
-            cost_queue = [sum(cost(j, U[j], w) * current_state[j, w] for w in waiting_times) for j in J]
-            action_comp = [0] * len(J)
-            for r in R:
-                total = sum(cost_queue[j] for j in r_queues[r])
-                if total == 0:
-                    for j in r_queues[r]:
-                        action_comp[j] = min(int(eta[r] / len(r_queues[r])),
-                                             sum(current_state[j, w] for w in range(U[j], W)))
-                else:
-                    for j in r_queues[r]:
-                        action_comp[j] = min(int(round(eta[r] * cost_queue[j] / total, 0)),
-                                             sum(current_state[j, w] for w in waiting_times))
-            action = {(j, w): 0 for j in J for w in range(W)}
-            for j in J:
-                remaining = action_comp[j]
-                for w in range(W - 1, -1, -1):
-                    a = min(current_state[j, w], remaining)
-                    action[j, w] = a
-                    remaining = remaining - a
-                    if remaining == 0:
-                        break
-
         else:
             action = 0
 

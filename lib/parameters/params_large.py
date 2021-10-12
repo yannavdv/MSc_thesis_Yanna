@@ -9,13 +9,16 @@ num_new_patients = 8
 eta = {'OD': 16, 'OR': 2}
 W = {(j, u): 3 * u for j in J for u in U[j]}
 
+idx = [(j, u, w) for j in J for u in U[j] for w in range(W[j, u])]
+
+lambdas = {(j, u): 0 for j in J for u in U[j]}
+lambdas[('FC', 2)] = num_new_patients
+
 zeta = {(j, r): 0 for j in J for r in R}
 zeta[('FC', 'OD')] = 1
 zeta[('RC', 'OD')] = 1
 zeta[('DC', 'OD')] = 1
 zeta[('OR', 'OR')] = 1
-
-idx = [(j, u, w) for j in J for u in U[j] for w in range(W[j, u])]
 
 q = {(i, u, j, v): 0 for i in J for u in U[i] for j in J for v in U[j]}
 

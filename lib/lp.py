@@ -2,6 +2,14 @@ from lib.functions import *
 
 
 def solve_lp(s_init, time_horizon, gamma=1, alpha=0):
+    """
+    Linear program (Section 7.3)
+    :param s_init: Current state
+    :param time_horizon: Time horizon used within LP
+    :param gamma: Discount factor
+    :param alpha: Percentage of appointments to fix in the LP when using static roster for Hybrid method
+    :return: Action to be performed for the current state
+    """
     m = gp.Model()
     m.Params.LogToConsole = 0
 
@@ -10,7 +18,6 @@ def solve_lp(s_init, time_horizon, gamma=1, alpha=0):
     x = m.addVars(state_idx, name="x")
     x_j = m.addVars(state_j_idx, name="x_j")
     s = m.addVars(state_idx, name="s")
-    y = m.addVars([(j, t) for j in r_queues['OD'] for t in range(time_horizon)], name="y", vtype=GRB.BINARY)
 
     # Initial conditions
     m.addConstrs(s[(*i, 0)] == s_init[i] for i in idx)
@@ -37,6 +44,7 @@ def solve_lp(s_init, time_horizon, gamma=1, alpha=0):
                  for t in range(1, time_horizon))
 
     if alpha > 0:  # Hybrid method
+        y = m.addVars([(j, t) for j in r_queues['OD'] for t in range(time_horizon)], name="y", vtype=GRB.BINARY)
         minimal = {'FC': alpha * 30, 'RC': alpha * 52, 'DC': alpha * 9}
         K = 1000
         m.addConstrs(minimal[j] - sum(s[j, u, w, t] for u in U[j] for w in range(W[j, u])) <= K*y[j, t]

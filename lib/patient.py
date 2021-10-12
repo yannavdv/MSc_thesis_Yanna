@@ -1,11 +1,12 @@
 from lib.parameters.params_smk import W
+# from lib.parameters.params_large import W
 
 
 class Patient:
     def __init__(self, path, stage, waiting_time):
         self.path = path  # Patient pathway
         self.stage = stage  # Integer indicating at which point the patient is in their pathway
-        self.waiting_time = waiting_time
+        self.waiting_time = waiting_time  # Current waiting time of patient
         self.active = True  # False when patient is done with treatment
 
     def __str__(self):
